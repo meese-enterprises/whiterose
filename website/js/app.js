@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const response = await fetch("./audio/tick.mp3");
         const arrayBuffer = await response.arrayBuffer();
         this.tickSound = await this.audioContext.decodeAudioData(arrayBuffer);
-        console.log("Tick sound loaded successfully");
+        console.debug("Tick sound loaded successfully");
       } catch (error) {
         console.error("Error loading tick sound:", error);
       }
@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
           this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
         this.audioContext.resume().then(() => {
-          console.log("AudioContext resumed successfully");
+          console.debug("AudioContext resumed successfully");
           if (!this.tickSound) {
             this.loadTickSound();
           }
@@ -173,7 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const newInterval = parseInt(this.updateIntervalInput.value);
       if (newInterval >= 1 && newInterval <= 60) {
         this.updateInterval = newInterval;
-        console.log(`Update interval set to ${this.updateInterval} minutes`);
+        console.debug(`Update interval set to ${this.updateInterval} minutes`);
         this.closeSettingsModal();
       } else {
         console.error("Invalid interval. Please enter a number between 1 and 60.");
