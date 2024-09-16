@@ -13,6 +13,9 @@ document.addEventListener("DOMContentLoaded", () => {
       this.themeToggle = document.getElementById("themeToggle");
       this.timeFormatToggle = document.getElementById("timeFormatToggle");
       this.use24HourFormat = false;
+      this.lastUpdateTime = Date.now();
+      this.audioWorker = null;
+      this.audioContext = null;
 
       this.setupEventListeners();
       this.start();
@@ -42,40 +45,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     start() {
+      this.lastUpdateTime = Date.now();
+      this.updateDisplay();
+    }
+
+    updateDisplay() {
       this.update();
-      this.updateInterval = setInterval(() => this.update(), 1000);
+      this.animationFrame = requestAnimationFrame(() => this.updateDisplay());
     }
 
     update() {
       const now = new Date();
-      let hours = now.getHours();
-      const minutes = now.getMinutes().toString().padStart(2, "0");
-      const seconds = now.getSeconds().toString().padStart(2, "0");
+      const currentTime = now.getTime();
+      const elapsedTime = currentTime - this.lastUpdateTime;
 
-      if (!this.use24HourFormat) {
-        hours = hours % 12 || 12;
-        // Remove leading zero for 12-hour format, except for 12 (noon/midnight)
-        hours = hours === 12 ? "12" : hours.toString().padStart(1, " ");
-      } else {
-        hours = hours.toString().padStart(2, "0");
-      }
+      if (elapsedTime >= 1000) {
+        this.lastUpdateTime = currentTime;
 
-      this.clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+        let hours = now.getHours();
+        const minutes = now.getMinutes().toString().padStart(2, "0");
+        const seconds = now.getSeconds().toString().padStart(2, "0");
 
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      const currentSeconds = now.getSeconds();
+        if (!this.use24HourFormat) {
+          hours = hours % 12 || 12;
+          hours = hours === 12 ? "12" : hours.toString().padStart(1, " ");
+        } else {
+          hours = hours.toString().padStart(2, "0");
+        }
 
-      if (currentSeconds === 0 && (currentMinutes % this.updateInterval === 0) && currentMinutes !== this.lastUpdate) {
-        this.lastUpdate = currentMinutes;
-        this.speakTime(hours, minutes);
-      } else {
-        this.playTickSound();
+        this.clockElement.textContent = `${hours}:${minutes}:${seconds}`;
       }
     }
 
     playTickSound() {
-      const now = new Date();
-      if (now.getSeconds() === 0 && this.audioEnabled && this.tickSound && this.audioContext && this.audioContext.state === "running") {
+      if (this.audioEnabled && this.tickSound && this.audioContext && this.audioContext.state === "running") {
         const source = this.audioContext.createBufferSource();
         source.buffer = this.tickSound;
         source.connect(this.audioContext.destination);
@@ -143,6 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     toggleAudio() {
       this.audioEnabled = !this.audioEnabled;
+      localStorage.setItem("audioEnabled", this.audioEnabled);
       this.audioToggle.textContent = this.audioEnabled ? "🔊" : "🔇";
       if (this.audioEnabled) {
         if (!this.audioContext) {
@@ -153,19 +157,42 @@ document.addEventListener("DOMContentLoaded", () => {
           if (!this.tickSound) {
             this.loadTickSound();
           }
+          this.initAudioWorker();
+          this.audioWorker.postMessage({ type: "start" });
         });
       } else {
+        if (this.audioWorker) {
+          this.audioWorker.postMessage({ type: "stop" });
+        }
         if (this.audioContext) {
           this.audioContext.suspend();
         }
       }
     }
 
+    initAudioWorker() {
+      if (typeof(Worker) !== "undefined") {
+        if (!this.audioWorker) {
+          this.audioWorker = new Worker("./js/audioWorker.js");
+          this.audioWorker.onmessage = (e) => {
+            if (e.data.type === "tick") {
+              this.playTickSound();
+            } else if (e.data.type === "update") {
+              const now = e.data.time;
+              this.speakTime(now.getHours(), now.getMinutes());
+            }
+          };
+        }
+      } else {
+        console.error("Web Workers are not supported in this browser.");
+      }
+    }
+
     handleVisibilityChange() {
       if (document.hidden) {
-        clearInterval(this.updateInterval);
+        cancelAnimationFrame(this.animationFrame);
       } else {
-        this.updateInterval = setInterval(() => this.update(), 1000);
+        this.updateDisplay();
       }
     }
 
@@ -173,6 +200,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const newInterval = parseInt(this.updateIntervalInput.value);
       if (newInterval >= 1 && newInterval <= 60) {
         this.updateInterval = newInterval;
+        localStorage.setItem("updateInterval", this.updateInterval);
+        if (this.audioWorker) {
+          this.audioWorker.postMessage({ type: "setUpdateInterval", interval: newInterval });
+        }
         console.debug(`Update interval set to ${this.updateInterval} minutes`);
         this.closeSettingsModal();
       } else {
@@ -220,6 +251,21 @@ document.addEventListener("DOMContentLoaded", () => {
       const savedTimeFormat = localStorage.getItem("timeFormat") || "12";
       this.timeFormatToggle.value = savedTimeFormat;
       this.switchTimeFormat();
+
+      const savedInterval = localStorage.getItem("updateInterval");
+      if (savedInterval) {
+        this.updateInterval = parseInt(savedInterval);
+        this.updateIntervalInput.value = this.updateInterval;
+      }
+
+      const savedAudioState = localStorage.getItem("audioEnabled");
+      if (savedAudioState) {
+        this.audioEnabled = savedAudioState === "true";
+        this.audioToggle.textContent = this.audioEnabled ? "🔊" : "🔇";
+        if (this.audioEnabled) {
+          this.toggleAudio();
+        }
+      }
     }
   }
 
