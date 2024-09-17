@@ -36,12 +36,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
-    val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val ticksEnabled by viewModel.ticksEnabled.collectAsState()
     val speechEnabled by viewModel.speechEnabled.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
 
-    WhiteroseTheme(darkTheme = isDarkTheme) {
+    WhiteroseTheme() {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize(),
@@ -62,11 +61,9 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
 
             if (showSettings) {
                 SettingsDialog(
-                    isDarkTheme = isDarkTheme,
                     ticksEnabled = ticksEnabled,
                     speechEnabled = speechEnabled,
                     onDismiss = { showSettings = false },
-                    onThemeChanged = viewModel::setDarkTheme,
                     onTicksChanged = viewModel::setTicksEnabled,
                     onSpeechChanged = viewModel::setSpeechEnabled
                 )
@@ -95,11 +92,9 @@ fun Clock() {
 
 @Composable
 fun SettingsDialog(
-    isDarkTheme: Boolean,
     ticksEnabled: Boolean,
     speechEnabled: Boolean,
     onDismiss: () -> Unit,
-    onThemeChanged: (Boolean) -> Unit,
     onTicksChanged: (Boolean) -> Unit,
     onSpeechChanged: (Boolean) -> Unit
 ) {
@@ -108,17 +103,6 @@ fun SettingsDialog(
         title = { Text("Settings") },
         text = {
             Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Dark Theme", modifier = Modifier.weight(1f))
-                    Switch(
-                        checked = isDarkTheme,
-                        onCheckedChange = onThemeChanged
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically

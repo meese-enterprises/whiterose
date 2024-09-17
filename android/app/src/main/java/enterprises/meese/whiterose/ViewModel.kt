@@ -12,9 +12,6 @@ import java.util.concurrent.TimeUnit
 class ViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("whiterose_prefs", Application.MODE_PRIVATE)
 
-    private val _isDarkTheme = MutableStateFlow(prefs.getBoolean("dark_theme", false))
-    val isDarkTheme = _isDarkTheme.asStateFlow()
-
     private val _ticksEnabled = MutableStateFlow(prefs.getBoolean("ticks_enabled", true))
     val ticksEnabled = _ticksEnabled.asStateFlow()
 
@@ -23,13 +20,6 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         updateWorkManager()
-    }
-
-    fun setDarkTheme(isDark: Boolean) {
-        viewModelScope.launch {
-            _isDarkTheme.emit(isDark)
-            prefs.edit().putBoolean("dark_theme", isDark).apply()
-        }
     }
 
     fun setTicksEnabled(enabled: Boolean) {
@@ -67,7 +57,7 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
 
         workManager.enqueueUniquePeriodicWork(
             "timeUpdate",
-            ExistingPeriodicWorkPolicy.REPLACE,
+            ExistingPeriodicWorkPolicy.UPDATE,
             timeUpdateWork
         )
     }
