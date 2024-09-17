@@ -16,6 +16,7 @@ class TimeUpdateWorker(
     private lateinit var tts: TextToSpeech
     private lateinit var soundPool: SoundPool
     private var tickSoundId: Int = 0
+    private var isSoundLoaded: Boolean = false
 
     override fun doWork(): Result {
         val ticksEnabled = inputData.getBoolean("ticks_enabled", true)
@@ -31,7 +32,10 @@ class TimeUpdateWorker(
             if (speechEnabled && minute % 15 == 0) {
                 speakTime(calendar)
             } else if (ticksEnabled) {
-                playTickSound()
+                // Only play the sound if it's loaded
+                if (isSoundLoaded) {
+                    playTickSound()
+                }
             }
         }
 
@@ -48,6 +52,12 @@ class TimeUpdateWorker(
             .setMaxStreams(1)
             .setAudioAttributes(attributes)
             .build()
+
+        soundPool.setOnLoadCompleteListener { _, _, status ->
+            if (status == 0) {
+                isSoundLoaded = true
+            }
+        }
 
         tickSoundId = soundPool.load(applicationContext, R.raw.tick_sound, 1)
     }
