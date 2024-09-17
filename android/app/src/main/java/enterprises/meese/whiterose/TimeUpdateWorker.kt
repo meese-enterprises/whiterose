@@ -13,19 +13,22 @@ class TimeUpdateWorker(
     params: WorkerParameters
 ) : Worker(context, params), TextToSpeech.OnInitListener {
 
-    private lateinit var tts: TextToSpeech
-    private lateinit var soundPool: SoundPool
+    private var tts: TextToSpeech? = null
+    private var soundPool: SoundPool? = null
     private var tickSoundId: Int = 0
     private var isSoundLoaded: Boolean = false
+
+    init {
+        // Initialize TTS and SoundPool once
+        tts = TextToSpeech(applicationContext, this)
+        setupSoundPool()
+    }
 
     override fun doWork(): Result {
         val ticksEnabled = inputData.getBoolean("ticks_enabled", true)
         val speechEnabled = inputData.getBoolean("speech_enabled", true)
 
         if (ticksEnabled || speechEnabled) {
-            tts = TextToSpeech(applicationContext, this)
-            setupSoundPool()
-
             val calendar = Calendar.getInstance()
             val minute = calendar.get(Calendar.MINUTE)
 
@@ -53,13 +56,13 @@ class TimeUpdateWorker(
             .setAudioAttributes(attributes)
             .build()
 
-        soundPool.setOnLoadCompleteListener { _, _, status ->
+        soundPool?.setOnLoadCompleteListener { _, _, status ->
             if (status == 0) {
                 isSoundLoaded = true
             }
         }
 
-        tickSoundId = soundPool.load(applicationContext, R.raw.tick_sound, 1)
+        tickSoundId = soundPool?.load(applicationContext, R.raw.tick_sound, 1) ?: 0
     }
 
     private fun speakTime(calendar: Calendar) {
@@ -67,21 +70,21 @@ class TimeUpdateWorker(
         val minute = calendar.get(Calendar.MINUTE)
         val amPm = if (calendar.get(Calendar.AM_PM) == Calendar.AM) "AM" else "PM"
         val timeString = "$hour ${if (minute == 0) "o'clock" else minute} $amPm"
-        tts.speak(timeString, TextToSpeech.QUEUE_FLUSH, null, null)
+        tts?.speak(timeString, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
     private fun playTickSound() {
-        soundPool.play(tickSoundId, 1f, 1f, 1, 0, 1f)
+        soundPool?.play(tickSoundId, 1f, 1f, 1, 0, 1f)
     }
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts.language = Locale.US
+            tts?.language = Locale.US
         }
     }
 
     override fun onStopped() {
-        tts.shutdown()
-        soundPool.release()
+        tts?.shutdown()
+        soundPool?.release()
     }
 }
