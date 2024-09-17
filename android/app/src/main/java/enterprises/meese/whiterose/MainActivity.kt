@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun WhiteroseApp(viewModel: WhiteroseViewModel = viewModel()) {
+fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val ticksEnabled by viewModel.ticksEnabled.collectAsState()
     val speechEnabled by viewModel.speechEnabled.collectAsState()

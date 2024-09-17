@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
-class WhiteroseViewModel(application: Application) : AndroidViewModel(application) {
+class ViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("whiterose_prefs", Application.MODE_PRIVATE)
 
     private val _isDarkTheme = MutableStateFlow(prefs.getBoolean("dark_theme", false))
