@@ -34,6 +34,23 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Homescreen widget provider -->
+        <receiver
+            android:name=".WhiteroseWidgetProvider"
+            android:exported="true">
+            <!-- Standard app-widget update broadcast -->
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="enterprises.meese.whiterose.action.WIDGET_UPDATE" />
+                <action android:name="enterprises.meese.whiterose.action.WIDGET_TOGGLE" />
+            </intent-filter>
+
+            <!-- AppWidget metadata -->
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/whiterose_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

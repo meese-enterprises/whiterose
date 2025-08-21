@@ -47,11 +47,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
-    val interval by viewModel.intervalMinutes.collectAsState()
     val serviceRunning by viewModel.serviceRunning.collectAsState()
-    val alignToClock by viewModel.alignToClock.collectAsState()
-    val playSound by viewModel.playSound.collectAsState()
-    val vibrate by viewModel.vibrate.collectAsState()
     val mode by viewModel.mode.collectAsState()
     val nextTriggerMs by viewModel.nextTriggerMs.collectAsState()
     val currentPhase by viewModel.currentPhase.collectAsState()
@@ -223,6 +219,7 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
     val pomoBreakMin by viewModel.pomoBreakMin.collectAsState()
     val pomoLongMin by viewModel.pomoLongMin.collectAsState()
     val pomoLongEvery by viewModel.pomoLongEvery.collectAsState()
+    val widgetMaterial by viewModel.widgetMaterial.collectAsState()
 
     var text by remember(interval) { mutableStateOf(interval.toString()) }
     var workText by remember(pomoWorkMin) { mutableStateOf(pomoWorkMin.toString()) }
@@ -399,6 +396,23 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
                 Spacer(Modifier.width(8.dp))
                 Switch(checked = vibrate, onCheckedChange = { viewModel.setVibrate(it) })
             }
+
+            /* Widget Material You toggle */
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Widget uses Material You")
+                Spacer(Modifier.width(8.dp))
+                Switch(
+                    checked = widgetMaterial,
+                    onCheckedChange = { viewModel.setWidgetMaterial(it) }
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "If changes don't apply immediately, remove and re-add the widget.",
+                style = MaterialTheme.typography.bodySmall
+            )
 
             /* Mode selection – vertical */
             Spacer(Modifier.height(24.dp))

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="8dp">
+
+    <!-- Tintable background with rounded corners -->
+    <ImageView
+        android:id="@+id/bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/widget_bg_shape"
+        android:scaleType="centerCrop" />
+
+    <!-- Content overlay -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <!-- Time countdown display -->
+        <TextView
+            android:id="@+id/txtTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:text="--:--" />
+
+        <!-- Phase display (Work/Break/Stopped) -->
+        <TextView
+            android:id="@+id/txtPhase"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="#AAAAAA"
+            android:text="Stopped" />
+
+        <!-- Start/Stop button -->
+        <Button
+            android:id="@+id/btnToggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Start"
+            android:textColor="#FFFFFF"
+            android:background="@android:color/transparent"
+            style="@android:style/Widget.DeviceDefault.Button.Borderless" />
+
+    </LinearLayout>
+</FrameLayout>
