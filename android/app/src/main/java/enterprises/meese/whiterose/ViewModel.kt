@@ -1,64 +1,61 @@
 package enterprises.meese.whiterose
 
 import android.app.Application
+import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 
 class ViewModel(application: Application) : AndroidViewModel(application) {
-    private val prefs = application.getSharedPreferences("whiterose_prefs", Application.MODE_PRIVATE)
+    private val prefs: SharedPreferences = application.getSharedPreferences("whiterose_prefs", Application.MODE_PRIVATE)
 
-    private val _ticksEnabled = MutableStateFlow(prefs.getBoolean("ticks_enabled", true))
-    val ticksEnabled = _ticksEnabled.asStateFlow()
+    private val _intervalMinutes = MutableStateFlow(prefs.getInt("interval_minutes", 5))
+    val intervalMinutes = _intervalMinutes.asStateFlow()
 
-    private val _speechEnabled = MutableStateFlow(prefs.getBoolean("speech_enabled", true))
-    val speechEnabled = _speechEnabled.asStateFlow()
+    private val _serviceRunning = MutableStateFlow(prefs.getBoolean("service_running", false))
+    val serviceRunning = _serviceRunning.asStateFlow()
+
+    private val _alignToClock = MutableStateFlow(prefs.getBoolean("align_to_clock", false))
+    val alignToClock = _alignToClock.asStateFlow()
+
+    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            "interval_minutes" -> _intervalMinutes.value = prefs.getInt("interval_minutes", 5)
+            "service_running" -> _serviceRunning.value = prefs.getBoolean("service_running", false)
+            "align_to_clock" -> _alignToClock.value = prefs.getBoolean("align_to_clock", false)
+        }
+    }
 
     init {
-        updateWorkManager()
+        prefs.registerOnSharedPreferenceChangeListener(listener)
     }
 
-    fun setTicksEnabled(enabled: Boolean) {
+    override fun onCleared() {
+        prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        super.onCleared()
+    }
+
+    fun setIntervalMinutes(minutes: Int) {
         viewModelScope.launch {
-            _ticksEnabled.emit(enabled)
-            prefs.edit().putBoolean("ticks_enabled", enabled).apply()
-            updateWorkManager()
+            _intervalMinutes.emit(minutes)
+            prefs.edit().putInt("interval_minutes", minutes).apply()
         }
     }
 
-    fun setSpeechEnabled(enabled: Boolean) {
+    fun setAlignToClock(enabled: Boolean) {
         viewModelScope.launch {
-            _speechEnabled.emit(enabled)
-            prefs.edit().putBoolean("speech_enabled", enabled).apply()
-            updateWorkManager()
+            _alignToClock.emit(enabled)
+            prefs.edit().putBoolean("align_to_clock", enabled).apply()
         }
     }
 
-    private fun updateWorkManager() {
-        val workManager = WorkManager.getInstance(getApplication())
+    fun startTimerService() {
+        IntervalTimerService.startService(getApplication(), intervalMinutes.value)
+    }
 
-        val constraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(true)
-            .build()
-
-        val inputData = workDataOf(
-            "ticks_enabled" to ticksEnabled.value,
-            "speech_enabled" to speechEnabled.value
-        )
-
-        val timeUpdateWork = PeriodicWorkRequestBuilder<TimeUpdateWorker>(15, TimeUnit.MINUTES)
-            .setConstraints(constraints)
-            .setInputData(inputData)
-            .build()
-
-        workManager.enqueueUniquePeriodicWork(
-            "timeUpdate",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            timeUpdateWork
-        )
+    fun stopTimerService() {
+        IntervalTimerService.stopService(getApplication())
     }
 }
