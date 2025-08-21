@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:background="#CC000000"
+    android:gravity="center">
+
+    <!-- Time countdown display -->
+    <TextView
+        android:id="@+id/txtTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="24sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:text="--:--" />
+
+    <!-- Phase display (Work/Break/Stopped) -->
+    <TextView
+        android:id="@+id/txtPhase"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="#AAAAAA"
+        android:text="Stopped" />
+
+    <!-- Start/Stop button -->
+    <Button
+        android:id="@+id/btnToggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Start"
+        android:textColor="#FFFFFF"
+        android:background="@android:color/transparent"
+        style="@android:style/Widget.DeviceDefault.Button.Borderless" />
+
+</LinearLayout>

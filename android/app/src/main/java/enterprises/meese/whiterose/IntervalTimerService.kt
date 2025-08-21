@@ -28,7 +28,8 @@ class IntervalTimerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var timerJob: Job? = null
     private var tickerJob: Job? = null
-
+    private val notificationIdCounter = AtomicInteger(NOTIFICATION_ID_DING_BASE)
+    
     // Sound and vibration
     private var soundPool: SoundPool? = null
     private var soundId: Int = 0
@@ -37,6 +38,12 @@ class IntervalTimerService : Service() {
     // Pomodoro tracking
     private var currentPhase: String = "work"
     private var cycleCount: Int = 0
+    
+    // Send broadcast to update widget
+    private fun broadcastWidgetUpdate() {
+        val intent = Intent(WhiteroseWidgetProvider.ACTION_WIDGET_UPDATE)
+        sendBroadcast(intent)
+    }
 
     companion object {
         const val ACTION_START = "enterprises.meese.whiterose.action.START"
@@ -127,6 +134,9 @@ class IntervalTimerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                prefs.edit().putBoolean(PREF_SERVICE_RUNNING, false).apply()
+                broadcastWidgetUpdate()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -144,6 +154,7 @@ class IntervalTimerService : Service() {
                         notify(NOTIFICATION_ID_FOREGROUND, notification)
                     }
                 }
+                broadcastWidgetUpdate()
                 return START_NOT_STICKY
             }
             ACTION_TOGGLE_VIBRATE -> {
@@ -160,6 +171,7 @@ class IntervalTimerService : Service() {
                         notify(NOTIFICATION_ID_FOREGROUND, notification)
                     }
                 }
+                broadcastWidgetUpdate()
                 return START_NOT_STICKY
             }
             ACTION_START -> {
@@ -221,6 +233,9 @@ class IntervalTimerService : Service() {
                 // Start the timer coroutine
                 startIntervalTimer(intervalMinutes)
                 
+                // Update widget
+                broadcastWidgetUpdate()
+                
                 return START_REDELIVER_INTENT
             }
             else -> return START_NOT_STICKY
@@ -235,6 +250,7 @@ class IntervalTimerService : Service() {
         tickerJob = serviceScope.launch {
             while (isActive) {
                 val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                val nextTriggerMs = prefs.getLong(PREF_NEXT_TRIGGER_MS, 0L)
                 val intervalMinutes = prefs.getInt(PREF_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES)
                 
                 // Update the foreground notification with the countdown
@@ -244,6 +260,9 @@ class IntervalTimerService : Service() {
                         notify(NOTIFICATION_ID_FOREGROUND, notification)
                     }
                 }
+                
+                // Update widget every second
+                broadcastWidgetUpdate()
                 
                 delay(1000) // Update every second
             }
@@ -346,7 +365,12 @@ class IntervalTimerService : Service() {
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(durationMs)
+                }
             }
         } catch (e: Exception) {
             // Ignore vibration errors
@@ -381,34 +405,36 @@ class IntervalTimerService : Service() {
     }
 
     private fun createNotificationChannels() {
-        // Create the tracker channel (low importance, no sound)
-        val trackerChannel = NotificationChannel(
-            CHANNEL_ID_TRACKER,
-            "Time Tracker",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Shows the time tracking service is running"
-            enableLights(false)
-            enableVibration(false)
-            setShowBadge(false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Create the tracker channel (low importance, no sound)
+            val trackerChannel = NotificationChannel(
+                CHANNEL_ID_TRACKER,
+                "Time Tracker",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows the time tracking service is running"
+                enableLights(false)
+                enableVibration(false)
+                setShowBadge(false)
+            }
+            
+            // Create the ding channel (high importance, with sound and vibration)
+            val dingChannel = NotificationChannel(
+                CHANNEL_ID_DING,
+                "Time Intervals",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Alerts when time intervals have passed"
+                enableLights(true)
+                enableVibration(true)
+                setShowBadge(true)
+            }
+            
+            // Register both channels
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(trackerChannel)
+            notificationManager.createNotificationChannel(dingChannel)
         }
-
-        // Create the ding channel (high importance, with sound and vibration)
-        val dingChannel = NotificationChannel(
-            CHANNEL_ID_DING,
-            "Time Intervals",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "Alerts when time intervals have passed"
-            enableLights(true)
-            enableVibration(true)
-            setShowBadge(true)
-        }
-
-        // Register both channels
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(trackerChannel)
-        notificationManager.createNotificationChannel(dingChannel)
     }
 
     private fun createForegroundNotification(intervalMinutes: Int): android.app.Notification {
@@ -515,6 +541,9 @@ class IntervalTimerService : Service() {
             .edit()
             .putBoolean(PREF_SERVICE_RUNNING, false)
             .apply()
+        
+        // Update widget one last time
+        broadcastWidgetUpdate()
         
         // Clean up resources
         timerJob?.cancel()

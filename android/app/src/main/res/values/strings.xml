@@ -29,4 +29,7 @@
     <string name="next_in_label">Next in %1$s</string>
     <string name="phase_work">Work</string>
     <string name="phase_break">Break</string>
+
+    <!-- Widget -->
+    <string name="widget_stopped">Stopped</string>
 </resources>
