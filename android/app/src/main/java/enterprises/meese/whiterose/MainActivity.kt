@@ -47,7 +47,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
+    val interval by viewModel.intervalMinutes.collectAsState()
     val serviceRunning by viewModel.serviceRunning.collectAsState()
+    val alignToClock by viewModel.alignToClock.collectAsState()
+    val playSound by viewModel.playSound.collectAsState()
+    val vibrate by viewModel.vibrate.collectAsState()
     val mode by viewModel.mode.collectAsState()
     val nextTriggerMs by viewModel.nextTriggerMs.collectAsState()
     val currentPhase by viewModel.currentPhase.collectAsState()
@@ -190,8 +194,10 @@ fun ClockAndStatus(
 
     /* Countdown until next trigger */
     val remainingMs = (nextTriggerMs - now).coerceAtLeast(0L)
-    val mins = (remainingMs / 1000 / 60).toInt()
-    val secs = (remainingMs / 1000 % 60).toInt()
+    // use ceiling so current clock seconds + countdown always sums to 60
+    val remainingSecTotal = kotlin.math.ceil(remainingMs / 1000.0).toLong()
+    val mins = (remainingSecTotal / 60).toInt()
+    val secs = (remainingSecTotal % 60).toInt()
     val remainingStr = String.format("%02d:%02d", mins, secs)
 
     Spacer(Modifier.height(2.dp))
@@ -312,47 +318,56 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
                 
                 Spacer(Modifier.height(8.dp))
                 
-                // Long break duration
-                OutlinedTextField(
-                    value = longText,
-                    onValueChange = {
-                        val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
-                        longText = sanitized
-                        val minutes = sanitized.toIntOrNull() ?: pomoLongMin
-                        if (minutes in 1..120) {
-                            viewModel.setPomodoroLong(minutes)
-                        }
-                    },
-                    label = { Text("Long break minutes") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(Modifier.height(8.dp))
-                
-                // Long break frequency
-                OutlinedTextField(
-                    value = everyText,
-                    onValueChange = {
-                        val sanitized = it.filter { ch -> ch.isDigit() }.take(2)
-                        everyText = sanitized
-                        val cycles = sanitized.toIntOrNull() ?: pomoLongEvery
-                        if (cycles in 1..12) {
-                            viewModel.setPomodoroLongEvery(cycles)
-                        }
-                    },
-                    label = { Text("Long break every N cycles") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "Pomodoro intervals are managed automatically with your custom durations.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                /* ----- Advanced-only (long break) settings ----- */
+                if (mode == IntervalTimerService.MODE_POMODORO_ADVANCED) {
+                    // Long break duration
+                    OutlinedTextField(
+                        value = longText,
+                        onValueChange = {
+                            val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
+                            longText = sanitized
+                            val minutes = sanitized.toIntOrNull() ?: pomoLongMin
+                            if (minutes in 1..120) {
+                                viewModel.setPomodoroLong(minutes)
+                            }
+                        },
+                        label = { Text("Long break minutes") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // Long break frequency
+                    OutlinedTextField(
+                        value = everyText,
+                        onValueChange = {
+                            val sanitized = it.filter { ch -> ch.isDigit() }.take(2)
+                            everyText = sanitized
+                            val cycles = sanitized.toIntOrNull() ?: pomoLongEvery
+                            if (cycles in 1..12) {
+                                viewModel.setPomodoroLongEvery(cycles)
+                            }
+                        },
+                        label = { Text("Long break every N cycles") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Work, short breaks, and long breaks will follow your custom durations.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Work and short breaks will follow your custom durations.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 
                 Spacer(Modifier.height(16.dp))
             }
