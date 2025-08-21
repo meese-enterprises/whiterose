@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.widget.RemoteViews
 import java.util.Locale
 import kotlin.math.ceil
@@ -24,6 +25,25 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
         private const val PREF_NAME = "whiterose_prefs"
         
         /**
+         * Choose the appropriate layout based on widget size
+         */
+        private fun chooseLayoutRes(context: Context, options: Bundle?): Int {
+            if (options != null) {
+                // Get min width and height in dp
+                val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+                val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+                
+                // Use large layout if widget is big enough
+                if (minWidth >= 200 && minHeight >= 120) {
+                    return R.layout.whiterose_widget
+                }
+            }
+            
+            // Default to compact layout
+            return R.layout.whiterose_widget_compact
+        }
+        
+        /**
          * Updates all widget instances
          */
         fun updateAll(context: Context) {
@@ -32,17 +52,33 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
                 ComponentName(context, WhiteroseWidgetProvider::class.java)
             )
             
-            if (appWidgetIds.isNotEmpty()) {
-                // Update all widgets
-                appWidgetManager.updateAppWidget(appWidgetIds, buildRemoteViews(context))
+            // Update each widget individually
+            for (appWidgetId in appWidgetIds) {
+                updateSingle(context, appWidgetManager, appWidgetId)
             }
+        }
+        
+        /**
+         * Updates a single widget instance
+         */
+        private fun updateSingle(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
+            // Get widget options to determine size
+            val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+            
+            // Build RemoteViews with the appropriate layout
+            val views = buildRemoteViews(context, options)
+            
+            // Update the widget
+            appWidgetManager.updateAppWidget(appWidgetId, views)
         }
         
         /**
          * Builds the RemoteViews for the widget
          */
-        private fun buildRemoteViews(context: Context): RemoteViews {
-            val views = RemoteViews(context.packageName, R.layout.whiterose_widget)
+        private fun buildRemoteViews(context: Context, options: Bundle? = null): RemoteViews {
+            // Choose layout based on size
+            val layoutId = chooseLayoutRes(context, options)
+            val views = RemoteViews(context.packageName, layoutId)
             
             // Get preferences
             val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -67,7 +103,7 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
             // Set time text
             views.setTextViewText(R.id.txtTime, timeText)
             
-            // Set phase text
+            // Set phase text (always set even if hidden in compact layout)
             val phaseText = if (!serviceRunning) {
                 "Stopped"
             } else if (mode == IntervalTimerService.MODE_SIMPLE) {
@@ -85,6 +121,23 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
                 context.getString(R.string.btn_start)
             }
             views.setTextViewText(R.id.btnToggle, buttonText)
+            
+            // Determine background color (try dynamic color first, fallback to semi-transparent black)
+            var bgColor = 0xCC000000.toInt() // Default: semi-transparent black
+            
+            if (Build.VERSION.SDK_INT >= 31) { // Android 12+
+                try {
+                    // Try to get system accent color
+                    val accentColor = context.getColor(android.R.color.system_accent1_800)
+                    // Apply alpha for translucency
+                    bgColor = (0xCC000000.toInt() and 0xFF000000.toInt()) or (accentColor and 0x00FFFFFF)
+                } catch (e: Exception) {
+                    // Fallback to default if system color not available
+                }
+            }
+            
+            // Apply background color
+            views.setInt(R.id.bg, "setColorFilter", bgColor)
             
             // Build PendingIntent that directly starts/stops the foreground service
             val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
@@ -121,7 +174,19 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray
     ) {
         // Update all widgets
-        updateAll(context)
+        for (appWidgetId in appWidgetIds) {
+            updateSingle(context, appWidgetManager, appWidgetId)
+        }
+    }
+    
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        // Widget size changed, update it
+        updateSingle(context, appWidgetManager, appWidgetId)
     }
     
     override fun onReceive(context: Context, intent: Intent) {

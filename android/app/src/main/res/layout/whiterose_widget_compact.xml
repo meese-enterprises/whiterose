@@ -20,24 +20,25 @@
         android:orientation="vertical"
         android:gravity="center">
 
-        <!-- Time countdown display -->
+        <!-- Time countdown display - smaller text -->
         <TextView
             android:id="@+id/txtTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="24sp"
+            android:textSize="20sp"
             android:textColor="#FFFFFF"
             android:textStyle="bold"
             android:text="--:--" />
 
-        <!-- Phase display (Work/Break/Stopped) -->
+        <!-- Phase display (hidden in compact mode) -->
         <TextView
             android:id="@+id/txtPhase"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:textColor="#AAAAAA"
-            android:text="Stopped" />
+            android:text="Stopped"
+            android:visibility="gone" />
 
         <!-- Start/Stop button -->
         <Button
