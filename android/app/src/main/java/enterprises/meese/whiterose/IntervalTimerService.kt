@@ -28,8 +28,7 @@ class IntervalTimerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var timerJob: Job? = null
     private var tickerJob: Job? = null
-    private val notificationIdCounter = AtomicInteger(NOTIFICATION_ID_DING_BASE)
-    
+
     // Sound and vibration
     private var soundPool: SoundPool? = null
     private var soundId: Int = 0
@@ -42,11 +41,13 @@ class IntervalTimerService : Service() {
     companion object {
         const val ACTION_START = "enterprises.meese.whiterose.action.START"
         const val ACTION_STOP = "enterprises.meese.whiterose.action.STOP"
+        const val ACTION_TOGGLE_SOUND = "enterprises.meese.whiterose.action.TOGGLE_SOUND"
+        const val ACTION_TOGGLE_VIBRATE = "enterprises.meese.whiterose.action.TOGGLE_VIBRATE"
         const val EXTRA_INTERVAL_MINUTES = "enterprises.meese.whiterose.extra.INTERVAL_MINUTES"
         
         private const val NOTIFICATION_ID_FOREGROUND = 1001
         private const val NOTIFICATION_ID_DING_BASE = 2000
-        /** Single ID used to replace the previous “ding” so notifications don’t stack */
+        /** Single ID used to replace the previous "ding" so notifications don't stack */
         private const val NOTIFICATION_ID_DING_SINGLE = 2002
         
         const val CHANNEL_ID_TRACKER = "whiterose_tracker"
@@ -60,6 +61,11 @@ class IntervalTimerService : Service() {
         private const val PREF_VIBRATE = "vibrate"
         private const val PREF_MODE = "mode"
         private const val PREF_NEXT_TRIGGER_MS = "next_trigger_ms"
+        private const val PREF_CURRENT_PHASE = "current_phase"
+        private const val PREF_POMO_WORK_MIN = "pomo_work_min"
+        private const val PREF_POMO_BREAK_MIN = "pomo_break_min"
+        private const val PREF_POMO_LONG_MIN = "pomo_long_min"
+        private const val PREF_POMO_LONG_EVERY = "pomo_long_every"
         
         private const val DEFAULT_INTERVAL_MINUTES = 5
         
@@ -68,10 +74,11 @@ class IntervalTimerService : Service() {
         const val MODE_POMODORO_SIMPLE = "pomodoro_simple"
         const val MODE_POMODORO_ADVANCED = "pomodoro_advanced"
         
-        // Pomodoro durations
-        const val WORK_MIN = 25
-        const val BREAK_MIN = 5
-        const val LONG_BREAK_MIN = 15
+        // Default Pomodoro durations
+        const val DEFAULT_WORK_MIN = 25
+        const val DEFAULT_BREAK_MIN = 5
+        const val DEFAULT_LONG_BREAK_MIN = 15
+        const val DEFAULT_LONG_BREAK_EVERY = 4
 
         fun buildStartIntent(context: Context, intervalMinutes: Int): Intent {
             return Intent(context, IntervalTimerService::class.java).apply {
@@ -123,6 +130,38 @@ class IntervalTimerService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+            ACTION_TOGGLE_SOUND -> {
+                val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                val currentValue = prefs.getBoolean(PREF_PLAY_SOUND, true)
+                prefs.edit().putBoolean(PREF_PLAY_SOUND, !currentValue).apply()
+                
+                // Update the foreground notification with the new settings
+                val notification = createForegroundNotification(
+                    prefs.getInt(PREF_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES)
+                )
+                with(NotificationManagerCompat.from(this)) {
+                    if (hasNotificationPermission()) {
+                        notify(NOTIFICATION_ID_FOREGROUND, notification)
+                    }
+                }
+                return START_NOT_STICKY
+            }
+            ACTION_TOGGLE_VIBRATE -> {
+                val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                val currentValue = prefs.getBoolean(PREF_VIBRATE, false)
+                prefs.edit().putBoolean(PREF_VIBRATE, !currentValue).apply()
+                
+                // Update the foreground notification with the new settings
+                val notification = createForegroundNotification(
+                    prefs.getInt(PREF_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES)
+                )
+                with(NotificationManagerCompat.from(this)) {
+                    if (hasNotificationPermission()) {
+                        notify(NOTIFICATION_ID_FOREGROUND, notification)
+                    }
+                }
+                return START_NOT_STICKY
+            }
             ACTION_START -> {
                 val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
                 
@@ -139,7 +178,12 @@ class IntervalTimerService : Service() {
                 if (mode != MODE_SIMPLE) {
                     currentPhase = "work"
                     cycleCount = 0
-                    intervalMinutes = WORK_MIN
+                    
+                    // Load custom work duration from preferences
+                    intervalMinutes = prefs.getInt(PREF_POMO_WORK_MIN, DEFAULT_WORK_MIN)
+                    
+                    // Save current phase to preferences
+                    prefs.edit().putString(PREF_CURRENT_PHASE, currentPhase).apply()
                 }
                 
                 // Save settings to preferences
@@ -191,7 +235,6 @@ class IntervalTimerService : Service() {
         tickerJob = serviceScope.launch {
             while (isActive) {
                 val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
-                val nextTriggerMs = prefs.getLong(PREF_NEXT_TRIGGER_MS, 0L)
                 val intervalMinutes = prefs.getInt(PREF_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES)
                 
                 // Update the foreground notification with the countdown
@@ -243,7 +286,7 @@ class IntervalTimerService : Service() {
                 // Post (or replace) silent notification if we have permission
                 if (hasNotificationPermission()) {
                     val notification = NotificationCompat.Builder(this@IntervalTimerService, CHANNEL_ID_DING)
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setSmallIcon(R.drawable.ic_notification_whiterose)
                         .setContentTitle(getString(R.string.ding_title))
                         .setContentText(getString(R.string.ding_text, minutesLabel(intervalMinutes)))
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -260,19 +303,34 @@ class IntervalTimerService : Service() {
                 
                 // If using Pomodoro mode, update phase and interval for next cycle
                 if (mode != MODE_SIMPLE) {
+                    // Get custom Pomodoro settings
+                    val workMin = prefs.getInt(PREF_POMO_WORK_MIN, DEFAULT_WORK_MIN)
+                    val breakMin = prefs.getInt(PREF_POMO_BREAK_MIN, DEFAULT_BREAK_MIN)
+                    val longBreakMin = prefs.getInt(PREF_POMO_LONG_MIN, DEFAULT_LONG_BREAK_MIN)
+                    val longBreakEvery = prefs.getInt(PREF_POMO_LONG_EVERY, DEFAULT_LONG_BREAK_EVERY)
+                    
                     if (currentPhase == "work") {
                         currentPhase = "break"
                         
-                        // For advanced mode, every 4th break is a long break
-                        if (mode == MODE_POMODORO_ADVANCED && cycleCount > 0 && cycleCount % 4 == 0) {
-                            prefs.edit().putInt(PREF_INTERVAL_MINUTES, LONG_BREAK_MIN).apply()
+                        // For advanced mode, every Nth break is a long break
+                        if (mode == MODE_POMODORO_ADVANCED && cycleCount > 0 && cycleCount % longBreakEvery == 0) {
+                            prefs.edit()
+                                .putInt(PREF_INTERVAL_MINUTES, longBreakMin)
+                                .putString(PREF_CURRENT_PHASE, currentPhase)
+                                .apply()
                         } else {
-                            prefs.edit().putInt(PREF_INTERVAL_MINUTES, BREAK_MIN).apply()
+                            prefs.edit()
+                                .putInt(PREF_INTERVAL_MINUTES, breakMin)
+                                .putString(PREF_CURRENT_PHASE, currentPhase)
+                                .apply()
                         }
                     } else {
                         currentPhase = "work"
                         cycleCount++
-                        prefs.edit().putInt(PREF_INTERVAL_MINUTES, WORK_MIN).apply()
+                        prefs.edit()
+                            .putInt(PREF_INTERVAL_MINUTES, workMin)
+                            .putString(PREF_CURRENT_PHASE, currentPhase)
+                            .apply()
                     }
                 }
             }
@@ -288,12 +346,7 @@ class IntervalTimerService : Service() {
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
-                } else {
-                    @Suppress("DEPRECATION")
-                    vibrator.vibrate(durationMs)
-                }
+                vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
             }
         } catch (e: Exception) {
             // Ignore vibration errors
@@ -328,39 +381,39 @@ class IntervalTimerService : Service() {
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create the tracker channel (low importance, no sound)
-            val trackerChannel = NotificationChannel(
-                CHANNEL_ID_TRACKER,
-                "Time Tracker",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows the time tracking service is running"
-                enableLights(false)
-                enableVibration(false)
-                setShowBadge(false)
-            }
-            
-            // Create the ding channel (high importance, with sound and vibration)
-            val dingChannel = NotificationChannel(
-                CHANNEL_ID_DING,
-                "Time Intervals",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Alerts when time intervals have passed"
-                enableLights(true)
-                enableVibration(true)
-                setShowBadge(true)
-            }
-            
-            // Register both channels
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(trackerChannel)
-            notificationManager.createNotificationChannel(dingChannel)
+        // Create the tracker channel (low importance, no sound)
+        val trackerChannel = NotificationChannel(
+            CHANNEL_ID_TRACKER,
+            "Time Tracker",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Shows the time tracking service is running"
+            enableLights(false)
+            enableVibration(false)
+            setShowBadge(false)
         }
+
+        // Create the ding channel (high importance, with sound and vibration)
+        val dingChannel = NotificationChannel(
+            CHANNEL_ID_DING,
+            "Time Intervals",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Alerts when time intervals have passed"
+            enableLights(true)
+            enableVibration(true)
+            setShowBadge(true)
+        }
+
+        // Register both channels
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(trackerChannel)
+        notificationManager.createNotificationChannel(dingChannel)
     }
 
     private fun createForegroundNotification(intervalMinutes: Int): android.app.Notification {
+        val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+        
         // Create a stop intent for the notification action
         val stopIntent = Intent(this, IntervalTimerService::class.java).apply {
             action = ACTION_STOP
@@ -372,15 +425,40 @@ class IntervalTimerService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         
+        // Create toggle sound intent
+        val toggleSoundIntent = Intent(this, IntervalTimerService::class.java).apply {
+            action = ACTION_TOGGLE_SOUND
+        }
+        val toggleSoundPendingIntent = PendingIntent.getService(
+            this,
+            1,
+            toggleSoundIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
+        // Create toggle vibrate intent
+        val toggleVibrateIntent = Intent(this, IntervalTimerService::class.java).apply {
+            action = ACTION_TOGGLE_VIBRATE
+        }
+        val toggleVibratePendingIntent = PendingIntent.getService(
+            this,
+            2,
+            toggleVibrateIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        
         // Get the next trigger time and compute remaining time
-        val nextTriggerMs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
-            .getLong(PREF_NEXT_TRIGGER_MS, 0L)
+        val nextTriggerMs = prefs.getLong(PREF_NEXT_TRIGGER_MS, 0L)
         val remainingMs = maxOf(0L, nextTriggerMs - System.currentTimeMillis())
         val remainingFormatted = formatRemaining(remainingMs)
         
         // Get mode and phase information
-        val mode = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
-            .getString(PREF_MODE, MODE_SIMPLE) ?: MODE_SIMPLE
+        val mode = prefs.getString(PREF_MODE, MODE_SIMPLE) ?: MODE_SIMPLE
+        val playSound = prefs.getBoolean(PREF_PLAY_SOUND, true)
+        val vibrate = prefs.getBoolean(PREF_VIBRATE, false)
+        
+        // Get current phase from preferences or use the instance variable
+        currentPhase = prefs.getString(PREF_CURRENT_PHASE, currentPhase) ?: currentPhase
         
         // Build the content text
         val contentText = if (mode == MODE_SIMPLE) {
@@ -397,15 +475,25 @@ class IntervalTimerService : Service() {
         
         // Create the notification
         return NotificationCompat.Builder(this, CHANNEL_ID_TRACKER)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification_whiterose)
             .setContentTitle(getString(R.string.tracker_title))
             .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
+                android.R.drawable.ic_media_pause,
                 getString(R.string.action_stop),
                 stopPendingIntent
+            )
+            .addAction(
+                if (playSound) android.R.drawable.ic_lock_silent_mode_off else android.R.drawable.ic_lock_silent_mode,
+                if (playSound) "Sound: ON" else "Sound: OFF",
+                toggleSoundPendingIntent
+            )
+            .addAction(
+                if (vibrate) android.R.drawable.ic_lock_idle_alarm else android.R.drawable.ic_lock_idle_alarm,
+                if (vibrate) "Vibrate: ON" else "Vibrate: OFF",
+                toggleVibratePendingIntent
             )
             .build()
     }

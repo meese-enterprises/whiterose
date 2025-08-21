@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@drawable/ic_launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
-    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+    <!-- Use solid black background for adaptive icon -->
+    <background android:drawable="@android:color/black" />
+
+    <!-- Foreground provided by user (1024 px transparent PNG) -->
+    <foreground android:drawable="@drawable/ic_whiterose_foreground" />
+
+    <!-- Monochrome version for notifications and themed icons -->
+    <monochrome android:drawable="@drawable/ic_notification_whiterose" />
 </adaptive-icon>

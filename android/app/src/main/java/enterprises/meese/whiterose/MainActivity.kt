@@ -53,6 +53,8 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
     val playSound by viewModel.playSound.collectAsState()
     val vibrate by viewModel.vibrate.collectAsState()
     val mode by viewModel.mode.collectAsState()
+    val nextTriggerMs by viewModel.nextTriggerMs.collectAsState()
+    val currentPhase by viewModel.currentPhase.collectAsState()
 
     /* -------------------------------- Permission Launcher ----------------------------- */
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,7 +89,12 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Clock()
+                ClockAndStatus(
+                    mode = mode,
+                    currentPhase = currentPhase,
+                    nextTriggerMs = nextTriggerMs,
+                    serviceRunning = serviceRunning
+                )
             }
 
             /* --------------------------- Bottom controls --------------------------- */
@@ -153,6 +160,57 @@ fun Clock() {
     )
 }
 
+@Composable
+fun ClockAndStatus(
+    mode: String,
+    currentPhase: String,
+    nextTriggerMs: Long,
+    serviceRunning: Boolean
+) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+
+    val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    Text(
+        text = timeFormat.format(Date(now)),
+        fontSize = 48.sp
+    )
+
+    /* -------- Phase & countdown -------- */
+    if (mode != IntervalTimerService.MODE_SIMPLE) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = when (currentPhase) {
+                "work" -> "Phase: Work"
+                else -> "Phase: Break"
+            },
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+
+    /* Countdown until next trigger */
+    if (serviceRunning) {
+        val remainingMs = (nextTriggerMs - now).coerceAtLeast(0L)
+        // use ceiling so current clock seconds + countdown always sums to 60
+        val remainingSecTotal = kotlin.math.ceil(remainingMs / 1000.0).toLong()
+        val mins = (remainingSecTotal / 60).toInt()
+        val secs = (remainingSecTotal % 60).toInt()
+        val remainingStr = String.format("%02d:%02d", mins, secs)
+
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = "Next in $remainingStr",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
 /* -------------------------------------------------------------------------- */
 @Composable
 fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
@@ -161,8 +219,16 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
     val playSound by viewModel.playSound.collectAsState()
     val vibrate by viewModel.vibrate.collectAsState()
     val mode by viewModel.mode.collectAsState()
+    val pomoWorkMin by viewModel.pomoWorkMin.collectAsState()
+    val pomoBreakMin by viewModel.pomoBreakMin.collectAsState()
+    val pomoLongMin by viewModel.pomoLongMin.collectAsState()
+    val pomoLongEvery by viewModel.pomoLongEvery.collectAsState()
 
     var text by remember(interval) { mutableStateOf(interval.toString()) }
+    var workText by remember(pomoWorkMin) { mutableStateOf(pomoWorkMin.toString()) }
+    var breakText by remember(pomoBreakMin) { mutableStateOf(pomoBreakMin.toString()) }
+    var longText by remember(pomoLongMin) { mutableStateOf(pomoLongMin.toString()) }
+    var everyText by remember(pomoLongEvery) { mutableStateOf(pomoLongEvery.toString()) }
 
     Surface(
         color = MaterialTheme.colorScheme.background.copy(alpha = 0.97f),
@@ -213,6 +279,103 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
             }
 
+            /* Pomodoro settings (non-simple modes) */
+            if (mode != IntervalTimerService.MODE_SIMPLE) {
+                Text("Pomodoro Settings", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                
+                // Work duration
+                OutlinedTextField(
+                    value = workText,
+                    onValueChange = {
+                        val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
+                        workText = sanitized
+                        val minutes = sanitized.toIntOrNull() ?: pomoWorkMin
+                        if (minutes in 1..120) {
+                            viewModel.setPomodoroWork(minutes)
+                        }
+                    },
+                    label = { Text("Work minutes") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(Modifier.height(8.dp))
+                
+                // Break duration
+                OutlinedTextField(
+                    value = breakText,
+                    onValueChange = {
+                        val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
+                        breakText = sanitized
+                        val minutes = sanitized.toIntOrNull() ?: pomoBreakMin
+                        if (minutes in 1..120) {
+                            viewModel.setPomodoroBreak(minutes)
+                        }
+                    },
+                    label = { Text("Break minutes") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(Modifier.height(8.dp))
+                
+                /* ----- Advanced-only (long break) settings ----- */
+                if (mode == IntervalTimerService.MODE_POMODORO_ADVANCED) {
+                    // Long break duration
+                    OutlinedTextField(
+                        value = longText,
+                        onValueChange = {
+                            val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
+                            longText = sanitized
+                            val minutes = sanitized.toIntOrNull() ?: pomoLongMin
+                            if (minutes in 1..120) {
+                                viewModel.setPomodoroLong(minutes)
+                            }
+                        },
+                        label = { Text("Long break minutes") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // Long break frequency
+                    OutlinedTextField(
+                        value = everyText,
+                        onValueChange = {
+                            val sanitized = it.filter { ch -> ch.isDigit() }.take(2)
+                            everyText = sanitized
+                            val cycles = sanitized.toIntOrNull() ?: pomoLongEvery
+                            if (cycles in 1..12) {
+                                viewModel.setPomodoroLongEvery(cycles)
+                            }
+                        },
+                        label = { Text("Long break every N cycles") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Work, short breaks, and long breaks will follow your custom durations.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Work and short breaks will follow your custom durations.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+            }
+
             /* Align switch */
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -256,15 +419,6 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
                         Text(label)
                     }
                 }
-            }
-
-            /* Pomodoro helper text (non-simple modes) */
-            if (mode != IntervalTimerService.MODE_SIMPLE) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "Pomodoro intervals are managed automatically (Work 25 • Break 5 • Long break 15).",
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
     }
