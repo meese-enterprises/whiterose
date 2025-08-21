@@ -28,8 +28,7 @@ class IntervalTimerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var timerJob: Job? = null
     private var tickerJob: Job? = null
-    private val notificationIdCounter = AtomicInteger(NOTIFICATION_ID_DING_BASE)
-    
+
     // Sound and vibration
     private var soundPool: SoundPool? = null
     private var soundId: Int = 0
@@ -236,7 +235,6 @@ class IntervalTimerService : Service() {
         tickerJob = serviceScope.launch {
             while (isActive) {
                 val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
-                val nextTriggerMs = prefs.getLong(PREF_NEXT_TRIGGER_MS, 0L)
                 val intervalMinutes = prefs.getInt(PREF_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES)
                 
                 // Update the foreground notification with the countdown
@@ -348,12 +346,7 @@ class IntervalTimerService : Service() {
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
-                } else {
-                    @Suppress("DEPRECATION")
-                    vibrator.vibrate(durationMs)
-                }
+                vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
             }
         } catch (e: Exception) {
             // Ignore vibration errors
@@ -388,36 +381,34 @@ class IntervalTimerService : Service() {
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Create the tracker channel (low importance, no sound)
-            val trackerChannel = NotificationChannel(
-                CHANNEL_ID_TRACKER,
-                "Time Tracker",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows the time tracking service is running"
-                enableLights(false)
-                enableVibration(false)
-                setShowBadge(false)
-            }
-            
-            // Create the ding channel (high importance, with sound and vibration)
-            val dingChannel = NotificationChannel(
-                CHANNEL_ID_DING,
-                "Time Intervals",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Alerts when time intervals have passed"
-                enableLights(true)
-                enableVibration(true)
-                setShowBadge(true)
-            }
-            
-            // Register both channels
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(trackerChannel)
-            notificationManager.createNotificationChannel(dingChannel)
+        // Create the tracker channel (low importance, no sound)
+        val trackerChannel = NotificationChannel(
+            CHANNEL_ID_TRACKER,
+            "Time Tracker",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Shows the time tracking service is running"
+            enableLights(false)
+            enableVibration(false)
+            setShowBadge(false)
         }
+
+        // Create the ding channel (high importance, with sound and vibration)
+        val dingChannel = NotificationChannel(
+            CHANNEL_ID_DING,
+            "Time Intervals",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Alerts when time intervals have passed"
+            enableLights(true)
+            enableVibration(true)
+            setShowBadge(true)
+        }
+
+        // Register both channels
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(trackerChannel)
+        notificationManager.createNotificationChannel(dingChannel)
     }
 
     private fun createForegroundNotification(intervalMinutes: Int): android.app.Notification {
