@@ -86,16 +86,29 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
             }
             views.setTextViewText(R.id.btnToggle, buttonText)
             
-            // Set button click action
-            val toggleIntent = Intent(context, WhiteroseWidgetProvider::class.java).apply {
-                action = ACTION_WIDGET_TOGGLE
+            // Build PendingIntent that directly starts/stops the foreground service
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+
+            val serviceIntent: Intent = if (serviceRunning) {
+                // Stop the timer
+                Intent(context, IntervalTimerService::class.java).apply {
+                    action = IntervalTimerService.ACTION_STOP
+                }
+            } else {
+                // Start the timer with the user-selected interval
+                Intent(context, IntervalTimerService::class.java).apply {
+                    action = IntervalTimerService.ACTION_START
+                    putExtra(IntervalTimerService.EXTRA_INTERVAL_MINUTES, intervalMinutes)
+                }
             }
-            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-            
-            val togglePendingIntent = PendingIntent.getBroadcast(
-                context, 0, toggleIntent, pendingFlags
-            )
+
+            val togglePendingIntent: PendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                PendingIntent.getForegroundService(context, 0, serviceIntent, pendingFlags)
+            } else {
+                PendingIntent.getService(context, 0, serviceIntent, pendingFlags)
+            }
+
             views.setOnClickPendingIntent(R.id.btnToggle, togglePendingIntent)
             
             return views
