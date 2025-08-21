@@ -47,7 +47,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
+    val interval by viewModel.intervalMinutes.collectAsState()
     val serviceRunning by viewModel.serviceRunning.collectAsState()
+    val alignToClock by viewModel.alignToClock.collectAsState()
+    val playSound by viewModel.playSound.collectAsState()
+    val vibrate by viewModel.vibrate.collectAsState()
+    val widgetMaterial by viewModel.widgetMaterial.collectAsState()
     val mode by viewModel.mode.collectAsState()
     val nextTriggerMs by viewModel.nextTriggerMs.collectAsState()
     val currentPhase by viewModel.currentPhase.collectAsState()
@@ -407,6 +412,12 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
                     onCheckedChange = { viewModel.setWidgetMaterial(it) }
                 )
             }
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "If changes don't apply immediately, remove and re-add the widget.",
+                style = MaterialTheme.typography.bodySmall
+            )
 
             /* Mode selection – vertical */
             Spacer(Modifier.height(24.dp))
