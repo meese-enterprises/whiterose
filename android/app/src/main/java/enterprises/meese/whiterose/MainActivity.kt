@@ -47,7 +47,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
+    val interval by viewModel.intervalMinutes.collectAsState()
     val serviceRunning by viewModel.serviceRunning.collectAsState()
+    val alignToClock by viewModel.alignToClock.collectAsState()
+    val playSound by viewModel.playSound.collectAsState()
+    val vibrate by viewModel.vibrate.collectAsState()
+    val mode by viewModel.mode.collectAsState()
 
     /* -------------------------------- Permission Launcher ----------------------------- */
     val snackbarHostState = remember { SnackbarHostState() }
@@ -176,33 +181,36 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
 
             Spacer(Modifier.height(8.dp))
 
-            /* Interval input */
-            OutlinedTextField(
-                value = text,
-                onValueChange = {
-                    val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
-                    text = sanitized
-                    val minutes = sanitized.toIntOrNull() ?: 0
-                    if (minutes in 1..120) {
-                        viewModel.setIntervalMinutes(minutes)
-                    }
-                },
-                label = { Text("Interval (minutes)") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
+            /* Interval (Simple mode only) */
+            if (mode == IntervalTimerService.MODE_SIMPLE) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = {
+                        val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
+                        text = sanitized
+                        val minutes = sanitized.toIntOrNull() ?: 0
+                        if (minutes in 1..120) {
+                            viewModel.setIntervalMinutes(minutes)
+                        }
+                    },
+                    label = { Text("Interval (minutes)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            /* Presets */
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(1, 5, 15).forEach { preset ->
-                    AssistChip(
-                        onClick = { viewModel.setIntervalMinutes(preset) },
-                        label = { Text("$preset") },
-                        colors = AssistChipDefaults.assistChipColors()
-                    )
+                /* Presets */
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(1, 5, 15).forEach { preset ->
+                        AssistChip(
+                            onClick = { viewModel.setIntervalMinutes(preset) },
+                            label = { Text("$preset") },
+                            colors = AssistChipDefaults.assistChipColors()
+                        )
+                    }
                 }
+                Spacer(Modifier.height(16.dp))
             }
 
             /* Align switch */
@@ -248,6 +256,15 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
                         Text(label)
                     }
                 }
+            }
+
+            /* Pomodoro helper text (non-simple modes) */
+            if (mode != IntervalTimerService.MODE_SIMPLE) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Pomodoro intervals are managed automatically (Work 25 • Break 5 • Long break 15).",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
