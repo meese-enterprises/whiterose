@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
@@ -39,9 +40,25 @@ class IntervalTimerService : Service() {
     private var currentPhase: String = "work"
     private var cycleCount: Int = 0
     
-    // Send broadcast to update widget
-    private fun broadcastWidgetUpdate() {
-        val intent = Intent(WhiteroseWidgetProvider.ACTION_WIDGET_UPDATE)
+    /**
+     * Refresh homescreen widget immediately.
+     *
+     * 1. Invoke the provider’s static helper to update all instances directly
+     *    via AppWidgetManager.
+     * 2. Also send an explicit broadcast (component-targeted) so any queued
+     *    receivers still trigger on older OS versions that rely on it.
+     */
+    private fun updateWidgetNow() {
+        // Direct AppWidgetManager update
+        WhiteroseWidgetProvider.updateAll(applicationContext)
+
+        // Fallback explicit broadcast
+        val intent = Intent(WhiteroseWidgetProvider.ACTION_WIDGET_UPDATE).apply {
+            component = ComponentName(
+                applicationContext,
+                WhiteroseWidgetProvider::class.java
+            )
+        }
         sendBroadcast(intent)
     }
 
@@ -136,7 +153,7 @@ class IntervalTimerService : Service() {
             ACTION_STOP -> {
                 val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
                 prefs.edit().putBoolean(PREF_SERVICE_RUNNING, false).apply()
-                broadcastWidgetUpdate()
+                updateWidgetNow()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -154,7 +171,7 @@ class IntervalTimerService : Service() {
                         notify(NOTIFICATION_ID_FOREGROUND, notification)
                     }
                 }
-                broadcastWidgetUpdate()
+                updateWidgetNow()
                 return START_NOT_STICKY
             }
             ACTION_TOGGLE_VIBRATE -> {
@@ -171,7 +188,7 @@ class IntervalTimerService : Service() {
                         notify(NOTIFICATION_ID_FOREGROUND, notification)
                     }
                 }
-                broadcastWidgetUpdate()
+                updateWidgetNow()
                 return START_NOT_STICKY
             }
             ACTION_START -> {
@@ -234,7 +251,7 @@ class IntervalTimerService : Service() {
                 startIntervalTimer(intervalMinutes)
                 
                 // Update widget
-                broadcastWidgetUpdate()
+                updateWidgetNow()
                 
                 return START_REDELIVER_INTENT
             }
@@ -262,7 +279,7 @@ class IntervalTimerService : Service() {
                 }
                 
                 // Update widget every second
-                broadcastWidgetUpdate()
+                updateWidgetNow()
                 
                 delay(1000) // Update every second
             }
@@ -543,7 +560,7 @@ class IntervalTimerService : Service() {
             .apply()
         
         // Update widget one last time
-        broadcastWidgetUpdate()
+        updateWidgetNow()
         
         // Clean up resources
         timerJob?.cancel()
