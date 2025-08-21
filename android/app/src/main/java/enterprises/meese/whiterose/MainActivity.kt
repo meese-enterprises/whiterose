@@ -47,12 +47,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
-    val interval by viewModel.intervalMinutes.collectAsState()
     val serviceRunning by viewModel.serviceRunning.collectAsState()
-    val alignToClock by viewModel.alignToClock.collectAsState()
-    val playSound by viewModel.playSound.collectAsState()
-    val vibrate by viewModel.vibrate.collectAsState()
-    val mode by viewModel.mode.collectAsState()
 
     /* -------------------------------- Permission Launcher ----------------------------- */
     val snackbarHostState = remember { SnackbarHostState() }

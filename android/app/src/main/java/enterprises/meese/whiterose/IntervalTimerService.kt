@@ -1,6 +1,4 @@
 package enterprises.meese.whiterose
-
-import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -196,7 +194,6 @@ class IntervalTimerService : Service() {
                 val notification = createForegroundNotification(intervalMinutes)
                 with(NotificationManagerCompat.from(this@IntervalTimerService)) {
                     if (hasNotificationPermission()) {
-                        @SuppressLint("MissingPermission")
                         notify(NOTIFICATION_ID_FOREGROUND, notification)
                     }
                 }
@@ -252,7 +249,6 @@ class IntervalTimerService : Service() {
                         .build()
                     
                     with(NotificationManagerCompat.from(this@IntervalTimerService)) {
-                        @SuppressLint("MissingPermission")
                         notify(notificationId, notification)
                     }
                 }
