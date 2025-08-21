@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -309,8 +310,8 @@ class IntervalTimerService : Service() {
                 // Wait for the interval
                 delay(delayMs)
                 
-                // Play sound if enabled
-                if (playSound && soundLoaded) {
+                // Play sound if enabled and not in DND or on a call
+                if (playSound && soundLoaded && !isInDoNotDisturb() && !isOnCall()) {
                     soundPool?.play(soundId, 1f, 1f, 1, 0, 1f)
                 }
                 
@@ -419,6 +420,28 @@ class IntervalTimerService : Service() {
         val minutes = (millisUntil / (1000 * 60)) % 60
         
         return String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    }
+
+    /**
+     * Returns true if system is currently in a Do Not Disturb interruption mode
+     * that should suppress notification sounds.
+     */
+    private fun isInDoNotDisturb(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
+        } else {
+            false
+        }
+    }
+
+    /**
+     * Returns true when the device audio mode indicates an active call or VoIP
+     * session so that chimes should be muted.
+     */
+    private fun isOnCall(): Boolean {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        return am.mode == AudioManager.MODE_IN_CALL || am.mode == AudioManager.MODE_IN_COMMUNICATION
     }
 
     private fun createNotificationChannels() {
