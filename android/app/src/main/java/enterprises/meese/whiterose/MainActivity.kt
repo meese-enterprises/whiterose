@@ -224,6 +224,7 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
     val pomoBreakMin by viewModel.pomoBreakMin.collectAsState()
     val pomoLongMin by viewModel.pomoLongMin.collectAsState()
     val pomoLongEvery by viewModel.pomoLongEvery.collectAsState()
+    val widgetMaterial by viewModel.widgetMaterial.collectAsState()
 
     var text by remember(interval) { mutableStateOf(interval.toString()) }
     var workText by remember(pomoWorkMin) { mutableStateOf(pomoWorkMin.toString()) }

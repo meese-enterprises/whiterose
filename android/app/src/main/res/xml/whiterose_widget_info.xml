@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Allow placement as small as 2×1 cells (~110×60 dp) -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    <!-- Allow placement as small as 2×1 cells (~110×60 dp) -->
     android:minWidth="110dp"
     android:minHeight="60dp"
     android:minResizeWidth="110dp"
