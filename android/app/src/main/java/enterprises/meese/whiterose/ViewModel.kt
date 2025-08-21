@@ -32,6 +32,22 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
     private val _nextTriggerMs = MutableStateFlow(prefs.getLong("next_trigger_ms", 0L))
     val nextTriggerMs = _nextTriggerMs.asStateFlow()
 
+    /* ---------------------- Pomodoro & phase additions ---------------------- */
+    private val _currentPhase = MutableStateFlow(prefs.getString("current_phase", "work") ?: "work")
+    val currentPhase = _currentPhase.asStateFlow()
+
+    private val _pomoWorkMin = MutableStateFlow(prefs.getInt("pomo_work_min", 25))
+    val pomoWorkMin = _pomoWorkMin.asStateFlow()
+
+    private val _pomoBreakMin = MutableStateFlow(prefs.getInt("pomo_break_min", 5))
+    val pomoBreakMin = _pomoBreakMin.asStateFlow()
+
+    private val _pomoLongMin = MutableStateFlow(prefs.getInt("pomo_long_min", 15))
+    val pomoLongMin = _pomoLongMin.asStateFlow()
+
+    private val _pomoLongEvery = MutableStateFlow(prefs.getInt("pomo_long_every", 4))
+    val pomoLongEvery = _pomoLongEvery.asStateFlow()
+
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "interval_minutes" -> _intervalMinutes.value = prefs.getInt("interval_minutes", 5)
@@ -41,6 +57,11 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
             "vibrate" -> _vibrate.value = prefs.getBoolean("vibrate", false)
             "mode" -> _mode.value = prefs.getString("mode", "simple") ?: "simple"
             "next_trigger_ms" -> _nextTriggerMs.value = prefs.getLong("next_trigger_ms", 0L)
+            "current_phase" -> _currentPhase.value = prefs.getString("current_phase", "work") ?: "work"
+            "pomo_work_min" -> _pomoWorkMin.value = prefs.getInt("pomo_work_min", 25)
+            "pomo_break_min" -> _pomoBreakMin.value = prefs.getInt("pomo_break_min", 5)
+            "pomo_long_min" -> _pomoLongMin.value = prefs.getInt("pomo_long_min", 15)
+            "pomo_long_every" -> _pomoLongEvery.value = prefs.getInt("pomo_long_every", 4)
         }
     }
 
@@ -85,6 +106,35 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _mode.emit(newMode)
             prefs.edit().putString("mode", newMode).apply()
+        }
+    }
+
+    /* ---------------- Pomodoro setters ---------------- */
+    fun setPomodoroWork(minutes: Int) {
+        viewModelScope.launch {
+            _pomoWorkMin.emit(minutes)
+            prefs.edit().putInt("pomo_work_min", minutes).apply()
+        }
+    }
+
+    fun setPomodoroBreak(minutes: Int) {
+        viewModelScope.launch {
+            _pomoBreakMin.emit(minutes)
+            prefs.edit().putInt("pomo_break_min", minutes).apply()
+        }
+    }
+
+    fun setPomodoroLong(minutes: Int) {
+        viewModelScope.launch {
+            _pomoLongMin.emit(minutes)
+            prefs.edit().putInt("pomo_long_min", minutes).apply()
+        }
+    }
+
+    fun setPomodoroLongEvery(cycles: Int) {
+        viewModelScope.launch {
+            _pomoLongEvery.emit(cycles)
+            prefs.edit().putInt("pomo_long_every", cycles).apply()
         }
     }
 
