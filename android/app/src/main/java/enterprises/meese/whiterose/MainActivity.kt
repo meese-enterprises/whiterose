@@ -4,19 +4,26 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import enterprises.meese.whiterose.ui.theme.WhiteroseTheme
@@ -40,19 +47,25 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
     val interval by viewModel.intervalMinutes.collectAsState()
+    val serviceRunning by viewModel.serviceRunning.collectAsState()
+    val alignToClock by viewModel.alignToClock.collectAsState()
 
     /* -------------------------------- Permission Launcher ----------------------------- */
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
             viewModel.startTimerService()
+            scope.launch { snackbarHostState.showSnackbar("Timer started") }
         }
     }
 
     WhiteroseTheme() {
         Box(modifier = Modifier.fillMaxSize()) {
+            SnackbarHost(hostState = snackbarHostState)
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
@@ -73,8 +86,9 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
                 OutlinedTextField(
                     value = text,
                     onValueChange = {
-                        text = it.filter { ch -> ch.isDigit() }.take(3)
-                        val minutes = text.toIntOrNull() ?: 0
+                        val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
+                        text = sanitized
+                        val minutes = sanitized.toIntOrNull() ?: 0
                         if (minutes in 1..120) {
                             viewModel.setIntervalMinutes(minutes)
                         }
@@ -84,6 +98,31 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                /* Quick preset chips */
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(1, 5, 15).forEach { preset ->
+                        AssistChip(
+                            onClick = { viewModel.setIntervalMinutes(preset) },
+                            label = { Text("$preset") },
+                            colors = AssistChipDefaults.assistChipColors()
+                        )
+                    }
+                }
+
+                /* Align-to-clock switch */
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Align to clock")
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = alignToClock,
+                        onCheckedChange = { viewModel.setAlignToClock(it) }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -96,12 +135,19 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
                             permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                         } else {
                             viewModel.startTimerService()
+                            scope.launch { snackbarHostState.showSnackbar("Timer started") }
                         }
-                    }) {
+                    }, enabled = !serviceRunning) {
                         Text("Start")
                     }
 
-                    OutlinedButton(onClick = { viewModel.stopTimerService() }) {
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.stopTimerService()
+                            scope.launch { snackbarHostState.showSnackbar("Timer stopped") }
+                        },
+                        enabled = serviceRunning
+                    ) {
                         Text("Stop")
                     }
                 }

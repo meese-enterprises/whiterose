@@ -15,6 +15,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.Calendar
 
 class IntervalTimerService : Service() {
 
@@ -35,6 +36,8 @@ class IntervalTimerService : Service() {
         
         private const val PREF_NAME = "whiterose_prefs"
         private const val PREF_INTERVAL_MINUTES = "interval_minutes"
+        private const val PREF_SERVICE_RUNNING = "service_running"
+        private const val PREF_ALIGN_TO_CLOCK = "align_to_clock"
         private const val DEFAULT_INTERVAL_MINUTES = 5
 
         fun buildStartIntent(context: Context, intervalMinutes: Int): Intent {
@@ -80,6 +83,7 @@ class IntervalTimerService : Service() {
                 getSharedPreferences(PREF_NAME, MODE_PRIVATE)
                     .edit()
                     .putInt(PREF_INTERVAL_MINUTES, intervalMinutes)
+                    .putBoolean(PREF_SERVICE_RUNNING, true)
                     .apply()
                 
                 // Start foreground service with notification
@@ -112,16 +116,17 @@ class IntervalTimerService : Service() {
         // Start a new timer
         timerJob = serviceScope.launch {
             while (isActive) {
-                // Wait for the specified interval
-                delay(intervalMinutes * 60_000L)
+                val alignPref = getSharedPreferences(PREF_NAME, MODE_PRIVATE).getBoolean(PREF_ALIGN_TO_CLOCK, false)
+                val delayMs = if (alignPref) computeAlignedDelayMillis(intervalMinutes) else intervalMinutes * 60_000L
+                delay(delayMs)
                 
                 // Post notification if we have permission
                 if (hasNotificationPermission()) {
                     val notificationId = notificationIdCounter.getAndIncrement()
                     val notification = NotificationCompat.Builder(this@IntervalTimerService, CHANNEL_ID_DING)
                         .setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle("Time tick")
-                        .setContentText("Another $intervalMinutes minutes passed")
+                        .setContentTitle(getString(R.string.ding_title))
+                        .setContentText(getString(R.string.ding_text, minutesLabel(intervalMinutes)))
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
                         .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
                         .setAutoCancel(true)
@@ -134,6 +139,24 @@ class IntervalTimerService : Service() {
             }
         }
     }
+
+    private fun computeAlignedDelayMillis(intervalMinutes: Int): Long {
+        val now = Calendar.getInstance()
+        val currentMinute = now.get(Calendar.MINUTE)
+        val currentSecond = now.get(Calendar.SECOND)
+        val currentMillis = now.get(Calendar.MILLISECOND)
+        
+        // Calculate minutes until next boundary
+        val minutesToNextBoundary = intervalMinutes - (currentMinute % intervalMinutes)
+        val minutesToWait = if (minutesToNextBoundary == 0 && (currentSecond > 0 || currentMillis > 0)) 
+            intervalMinutes else minutesToNextBoundary
+        
+        // Convert to milliseconds, subtracting elapsed seconds and milliseconds
+        return (minutesToWait * 60 * 1000L) - (currentSecond * 1000L) - currentMillis
+    }
+
+    private fun minutesLabel(minutes: Int): String = 
+        resources.getQuantityString(R.plurals.minutes_label, minutes, minutes)
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -183,13 +206,13 @@ class IntervalTimerService : Service() {
         // Create the notification
         return NotificationCompat.Builder(this, CHANNEL_ID_TRACKER)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Whiterose Timer")
-            .setContentText("Tracking time in $intervalMinutes minute intervals")
+            .setContentTitle(getString(R.string.tracker_title))
+            .setContentText(getString(R.string.tracker_text, minutesLabel(intervalMinutes)))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Stop",
+                getString(R.string.action_stop),
                 stopPendingIntent
             )
             .build()
@@ -207,6 +230,12 @@ class IntervalTimerService : Service() {
     }
 
     override fun onDestroy() {
+        // Update service running state
+        getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+            .edit()
+            .putBoolean(PREF_SERVICE_RUNNING, false)
+            .apply()
+            
         timerJob?.cancel()
         serviceScope.cancel()
         super.onDestroy()

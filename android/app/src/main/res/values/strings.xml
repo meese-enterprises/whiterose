@@ -1,3 +1,21 @@
 <resources>
     <string name="app_name">Whiterose</string>
+
+    <plurals name="minutes_label">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+
+    <string name="tracker_title">Whiterose Timer</string>
+    <string name="tracker_text">Tracking time in %1$s intervals</string>
+    <string name="ding_title">Time tick</string>
+    <string name="ding_text">Another %1$s passed</string>
+    <string name="action_stop">Stop</string>
+
+    <string name="label_interval">Interval (minutes)</string>
+    <string name="label_align">Align to clock</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
+    <string name="msg_started">Timer started</string>
+    <string name="msg_stopped">Timer stopped</string>
 </resources>
