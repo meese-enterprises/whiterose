@@ -20,11 +20,27 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
     private val _alignToClock = MutableStateFlow(prefs.getBoolean("align_to_clock", false))
     val alignToClock = _alignToClock.asStateFlow()
 
+    private val _playSound = MutableStateFlow(prefs.getBoolean("play_sound", true))
+    val playSound = _playSound.asStateFlow()
+
+    private val _vibrate = MutableStateFlow(prefs.getBoolean("vibrate", false))
+    val vibrate = _vibrate.asStateFlow()
+
+    private val _mode = MutableStateFlow(prefs.getString("mode", "simple") ?: "simple")
+    val mode = _mode.asStateFlow()
+
+    private val _nextTriggerMs = MutableStateFlow(prefs.getLong("next_trigger_ms", 0L))
+    val nextTriggerMs = _nextTriggerMs.asStateFlow()
+
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "interval_minutes" -> _intervalMinutes.value = prefs.getInt("interval_minutes", 5)
             "service_running" -> _serviceRunning.value = prefs.getBoolean("service_running", false)
             "align_to_clock" -> _alignToClock.value = prefs.getBoolean("align_to_clock", false)
+            "play_sound" -> _playSound.value = prefs.getBoolean("play_sound", true)
+            "vibrate" -> _vibrate.value = prefs.getBoolean("vibrate", false)
+            "mode" -> _mode.value = prefs.getString("mode", "simple") ?: "simple"
+            "next_trigger_ms" -> _nextTriggerMs.value = prefs.getLong("next_trigger_ms", 0L)
         }
     }
 
@@ -48,6 +64,27 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _alignToClock.emit(enabled)
             prefs.edit().putBoolean("align_to_clock", enabled).apply()
+        }
+    }
+
+    fun setPlaySound(enabled: Boolean) {
+        viewModelScope.launch {
+            _playSound.emit(enabled)
+            prefs.edit().putBoolean("play_sound", enabled).apply()
+        }
+    }
+
+    fun setVibrate(enabled: Boolean) {
+        viewModelScope.launch {
+            _vibrate.emit(enabled)
+            prefs.edit().putBoolean("vibrate", enabled).apply()
+        }
+    }
+
+    fun setMode(newMode: String) {
+        viewModelScope.launch {
+            _mode.emit(newMode)
+            prefs.edit().putString("mode", newMode).apply()
         }
     }
 

@@ -18,4 +18,15 @@
     <string name="btn_stop">Stop</string>
     <string name="msg_started">Timer started</string>
     <string name="msg_stopped">Timer stopped</string>
+
+    <!-- === New strings for upcoming UX features === -->
+    <string name="label_sound">Play sound</string>
+    <string name="label_vibrate">Vibrate</string>
+    <string name="label_mode">Mode</string>
+    <string name="mode_simple">Simple</string>
+    <string name="mode_pomodoro_simple">Pomodoro (25/5)</string>
+    <string name="mode_pomodoro_advanced">Pomodoro (25/5 + 15)</string>
+    <string name="next_in_label">Next in %1$s</string>
+    <string name="phase_work">Work</string>
+    <string name="phase_break">Break</string>
 </resources>
