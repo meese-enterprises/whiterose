@@ -30,6 +30,7 @@
         <!-- Foreground service that delivers interval timer notifications -->
         <service
             android:name=".IntervalTimerService"
+            android:foregroundServiceType="dataSync"
             android:enabled="true"
             android:exported="false" />
     </application>

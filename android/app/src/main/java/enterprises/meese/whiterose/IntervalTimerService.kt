@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -82,10 +83,18 @@ class IntervalTimerService : Service() {
                     .apply()
                 
                 // Start foreground service with notification
-                startForeground(
-                    NOTIFICATION_ID_FOREGROUND,
-                    createForegroundNotification(intervalMinutes)
-                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    startForeground(
+                        NOTIFICATION_ID_FOREGROUND,
+                        createForegroundNotification(intervalMinutes),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                } else {
+                    startForeground(
+                        NOTIFICATION_ID_FOREGROUND,
+                        createForegroundNotification(intervalMinutes)
+                    )
+                }
                 
                 // Start the timer coroutine
                 startIntervalTimer(intervalMinutes)
