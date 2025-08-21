@@ -52,6 +52,7 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
     val alignToClock by viewModel.alignToClock.collectAsState()
     val playSound by viewModel.playSound.collectAsState()
     val vibrate by viewModel.vibrate.collectAsState()
+    val widgetMaterial by viewModel.widgetMaterial.collectAsState()
     val mode by viewModel.mode.collectAsState()
     val nextTriggerMs by viewModel.nextTriggerMs.collectAsState()
     val currentPhase by viewModel.currentPhase.collectAsState()
@@ -398,6 +399,17 @@ fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
                 Text("Vibrate")
                 Spacer(Modifier.width(8.dp))
                 Switch(checked = vibrate, onCheckedChange = { viewModel.setVibrate(it) })
+            }
+
+            /* Widget Material You toggle */
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Widget uses Material You")
+                Spacer(Modifier.width(8.dp))
+                Switch(
+                    checked = widgetMaterial,
+                    onCheckedChange = { viewModel.setWidgetMaterial(it) }
+                )
             }
 
             /* Mode selection – vertical */

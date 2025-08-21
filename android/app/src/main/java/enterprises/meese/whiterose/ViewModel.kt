@@ -1,6 +1,7 @@
 package enterprises.meese.whiterose
 
 import android.app.Application
+import android.content.Intent
 import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -48,6 +49,10 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
     private val _pomoLongEvery = MutableStateFlow(prefs.getInt("pomo_long_every", 4))
     val pomoLongEvery = _pomoLongEvery.asStateFlow()
 
+    /* ----------------------- Widget appearance toggle ---------------------- */
+    private val _widgetMaterial = MutableStateFlow(prefs.getBoolean("widget_material", true))
+    val widgetMaterial = _widgetMaterial.asStateFlow()
+
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         when (key) {
             "interval_minutes" -> _intervalMinutes.value = prefs.getInt("interval_minutes", 5)
@@ -62,6 +67,7 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
             "pomo_break_min" -> _pomoBreakMin.value = prefs.getInt("pomo_break_min", 5)
             "pomo_long_min" -> _pomoLongMin.value = prefs.getInt("pomo_long_min", 15)
             "pomo_long_every" -> _pomoLongEvery.value = prefs.getInt("pomo_long_every", 4)
+            "widget_material" -> _widgetMaterial.value = prefs.getBoolean("widget_material", true)
         }
     }
 
@@ -135,6 +141,19 @@ class ViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _pomoLongEvery.emit(cycles)
             prefs.edit().putInt("pomo_long_every", cycles).apply()
+        }
+    }
+
+    /* ---------------- Widget style setter ---------------- */
+    fun setWidgetMaterial(enabled: Boolean) {
+        viewModelScope.launch {
+            _widgetMaterial.emit(enabled)
+            prefs.edit().putBoolean("widget_material", enabled).apply()
+
+            // Broadcast to refresh widgets immediately
+            val ctx = getApplication<Application>()
+            val intent = Intent(WhiteroseWidgetProvider.ACTION_WIDGET_UPDATE)
+            ctx.sendBroadcast(intent)
         }
     }
 

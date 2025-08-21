@@ -33,13 +33,16 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
                 val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
                 val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
                 
-                // Use large layout if widget is big enough
-                if (minWidth >= 200 && minHeight >= 120) {
+                // Compact if either dimension is below our large-layout threshold
+                // (≈ 3×2 cells ~ 180×110 dp).  Otherwise use large layout.
+                if (minWidth < 180 || minHeight < 110) {
+                    return R.layout.whiterose_widget_compact
+                } else {
                     return R.layout.whiterose_widget
                 }
             }
             
-            // Default to compact layout
+            // Fallback when options unavailable
             return R.layout.whiterose_widget_compact
         }
         
@@ -124,8 +127,9 @@ class WhiteroseWidgetProvider : AppWidgetProvider() {
             
             // Determine background color (try dynamic color first, fallback to semi-transparent black)
             var bgColor = 0xCC000000.toInt() // Default: semi-transparent black
+            val useMaterial = prefs.getBoolean("widget_material", true)
             
-            if (Build.VERSION.SDK_INT >= 31) { // Android 12+
+            if (useMaterial && Build.VERSION.SDK_INT >= 31) { // Android 12+ and user allows Material You
                 try {
                     // Try to get system accent color
                     val accentColor = context.getColor(android.R.color.system_accent1_800)
