@@ -92,7 +92,8 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
                 ClockAndStatus(
                     mode = mode,
                     currentPhase = currentPhase,
-                    nextTriggerMs = nextTriggerMs
+                    nextTriggerMs = nextTriggerMs,
+                    serviceRunning = serviceRunning
                 )
             }
 
@@ -163,7 +164,8 @@ fun Clock() {
 fun ClockAndStatus(
     mode: String,
     currentPhase: String,
-    nextTriggerMs: Long
+    nextTriggerMs: Long,
+    serviceRunning: Boolean
 ) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
@@ -193,18 +195,20 @@ fun ClockAndStatus(
     }
 
     /* Countdown until next trigger */
-    val remainingMs = (nextTriggerMs - now).coerceAtLeast(0L)
-    // use ceiling so current clock seconds + countdown always sums to 60
-    val remainingSecTotal = kotlin.math.ceil(remainingMs / 1000.0).toLong()
-    val mins = (remainingSecTotal / 60).toInt()
-    val secs = (remainingSecTotal % 60).toInt()
-    val remainingStr = String.format("%02d:%02d", mins, secs)
+    if (serviceRunning) {
+        val remainingMs = (nextTriggerMs - now).coerceAtLeast(0L)
+        // use ceiling so current clock seconds + countdown always sums to 60
+        val remainingSecTotal = kotlin.math.ceil(remainingMs / 1000.0).toLong()
+        val mins = (remainingSecTotal / 60).toInt()
+        val secs = (remainingSecTotal % 60).toInt()
+        val remainingStr = String.format("%02d:%02d", mins, secs)
 
-    Spacer(Modifier.height(2.dp))
-    Text(
-        text = "Next in $remainingStr",
-        style = MaterialTheme.typography.bodySmall
-    )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = "Next in $remainingStr",
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
 }
 
 /* -------------------------------------------------------------------------- */
