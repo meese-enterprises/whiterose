@@ -1,4 +1,5 @@
 package enterprises.meese.whiterose
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -45,6 +46,8 @@ class IntervalTimerService : Service() {
         
         private const val NOTIFICATION_ID_FOREGROUND = 1001
         private const val NOTIFICATION_ID_DING_BASE = 2000
+        /** Single ID used to replace the previous “ding” so notifications don’t stack */
+        private const val NOTIFICATION_ID_DING_SINGLE = 2002
         
         const val CHANNEL_ID_TRACKER = "whiterose_tracker"
         const val CHANNEL_ID_DING = "whiterose_ding"
@@ -188,6 +191,7 @@ class IntervalTimerService : Service() {
         tickerJob = serviceScope.launch {
             while (isActive) {
                 val prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE)
+                val nextTriggerMs = prefs.getLong(PREF_NEXT_TRIGGER_MS, 0L)
                 val intervalMinutes = prefs.getInt(PREF_INTERVAL_MINUTES, DEFAULT_INTERVAL_MINUTES)
                 
                 // Update the foreground notification with the countdown
@@ -236,20 +240,21 @@ class IntervalTimerService : Service() {
                     vibrate(200)
                 }
                 
-                // Post silent notification if we have permission
+                // Post (or replace) silent notification if we have permission
                 if (hasNotificationPermission()) {
-                    val notificationId = notificationIdCounter.getAndIncrement()
                     val notification = NotificationCompat.Builder(this@IntervalTimerService, CHANNEL_ID_DING)
                         .setSmallIcon(android.R.drawable.ic_dialog_info)
                         .setContentTitle(getString(R.string.ding_title))
                         .setContentText(getString(R.string.ding_text, minutesLabel(intervalMinutes)))
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
                         // No sound or vibration defaults - we handle these manually
+                        .setTimeoutAfter(4000) // auto-dismiss after 4 s
                         .setAutoCancel(true)
                         .build()
                     
                     with(NotificationManagerCompat.from(this@IntervalTimerService)) {
-                        notify(notificationId, notification)
+                        // Always re-use the same ID so previous ding is replaced
+                        notify(NOTIFICATION_ID_DING_SINGLE, notification)
                     }
                 }
                 
@@ -283,7 +288,12 @@ class IntervalTimerService : Service() {
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(durationMs)
+                }
             }
         } catch (e: Exception) {
             // Ignore vibration errors
@@ -318,34 +328,36 @@ class IntervalTimerService : Service() {
     }
 
     private fun createNotificationChannels() {
-        // Create the tracker channel (low importance, no sound)
-        val trackerChannel = NotificationChannel(
-            CHANNEL_ID_TRACKER,
-            "Time Tracker",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Shows the time tracking service is running"
-            enableLights(false)
-            enableVibration(false)
-            setShowBadge(false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Create the tracker channel (low importance, no sound)
+            val trackerChannel = NotificationChannel(
+                CHANNEL_ID_TRACKER,
+                "Time Tracker",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows the time tracking service is running"
+                enableLights(false)
+                enableVibration(false)
+                setShowBadge(false)
+            }
+            
+            // Create the ding channel (high importance, with sound and vibration)
+            val dingChannel = NotificationChannel(
+                CHANNEL_ID_DING,
+                "Time Intervals",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Alerts when time intervals have passed"
+                enableLights(true)
+                enableVibration(true)
+                setShowBadge(true)
+            }
+            
+            // Register both channels
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(trackerChannel)
+            notificationManager.createNotificationChannel(dingChannel)
         }
-
-        // Create the ding channel (high importance, with sound and vibration)
-        val dingChannel = NotificationChannel(
-            CHANNEL_ID_DING,
-            "Time Intervals",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "Alerts when time intervals have passed"
-            enableLights(true)
-            enableVibration(true)
-            setShowBadge(true)
-        }
-
-        // Register both channels
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(trackerChannel)
-        notificationManager.createNotificationChannel(dingChannel)
     }
 
     private fun createForegroundNotification(intervalMinutes: Int): android.app.Notification {
