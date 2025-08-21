@@ -12,16 +12,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -52,10 +53,8 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
     val playSound by viewModel.playSound.collectAsState()
     val vibrate by viewModel.vibrate.collectAsState()
     val mode by viewModel.mode.collectAsState()
-    val nextTriggerMs by viewModel.nextTriggerMs.collectAsState()
 
     /* -------------------------------- Permission Launcher ----------------------------- */
-    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -63,22 +62,32 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
     ) { granted ->
         if (granted) {
             viewModel.startTimerService()
-            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_started)) }
+            scope.launch { snackbarHostState.showSnackbar("Timer started") }
         }
     }
 
     WhiteroseTheme() {
+        var showSettings by remember { mutableStateOf(false) }
+
         Box(modifier = Modifier.fillMaxSize()) {
             SnackbarHost(hostState = snackbarHostState)
+
+            /* --------------------------- Top bar --------------------------- */
+            TextButton(
+                onClick = { showSettings = true },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Text("Settings")
+            }
+
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Clock()
-                
-                // Countdown timer display
-                CountdownDisplay(nextTriggerMs)
             }
 
             /* --------------------------- Bottom controls --------------------------- */
@@ -88,132 +97,6 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Mode selection
-                Text(
-                    text = context.getString(R.string.label_mode),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    RadioButton(
-                        selected = mode == IntervalTimerService.MODE_SIMPLE,
-                        onClick = { viewModel.setMode(IntervalTimerService.MODE_SIMPLE) },
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    Text(
-                        text = context.getString(R.string.mode_simple),
-                        modifier = Modifier
-                            .clickable { viewModel.setMode(IntervalTimerService.MODE_SIMPLE) }
-                            .padding(start = 4.dp, end = 8.dp)
-                    )
-                    
-                    RadioButton(
-                        selected = mode == IntervalTimerService.MODE_POMODORO_SIMPLE,
-                        onClick = { viewModel.setMode(IntervalTimerService.MODE_POMODORO_SIMPLE) },
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    Text(
-                        text = context.getString(R.string.mode_pomodoro_simple),
-                        modifier = Modifier
-                            .clickable { viewModel.setMode(IntervalTimerService.MODE_POMODORO_SIMPLE) }
-                            .padding(start = 4.dp, end = 8.dp)
-                    )
-                    
-                    RadioButton(
-                        selected = mode == IntervalTimerService.MODE_POMODORO_ADVANCED,
-                        onClick = { viewModel.setMode(IntervalTimerService.MODE_POMODORO_ADVANCED) },
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    Text(
-                        text = context.getString(R.string.mode_pomodoro_advanced),
-                        modifier = Modifier
-                            .clickable { viewModel.setMode(IntervalTimerService.MODE_POMODORO_ADVANCED) }
-                            .padding(start = 4.dp)
-                    )
-                }
-                
-                Spacer(Modifier.height(16.dp))
-                
-                // Sound and vibration toggles
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(context.getString(R.string.label_sound))
-                        Spacer(Modifier.width(8.dp))
-                        Switch(
-                            checked = playSound,
-                            onCheckedChange = { viewModel.setPlaySound(it) }
-                        )
-                    }
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(context.getString(R.string.label_vibrate))
-                        Spacer(Modifier.width(8.dp))
-                        Switch(
-                            checked = vibrate,
-                            onCheckedChange = { viewModel.setVibrate(it) }
-                        )
-                    }
-                }
-                
-                Spacer(Modifier.height(16.dp))
-
-                var text by remember(interval) { mutableStateOf(interval.toString()) }
-
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = {
-                        val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
-                        text = sanitized
-                        val minutes = sanitized.toIntOrNull() ?: 0
-                        if (minutes in 1..120) {
-                            viewModel.setIntervalMinutes(minutes)
-                        }
-                    },
-                    label = { Text(context.getString(R.string.label_interval)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                /* Quick preset chips */
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(1, 5, 15).forEach { preset ->
-                        AssistChip(
-                            onClick = { viewModel.setIntervalMinutes(preset) },
-                            label = { Text("$preset") },
-                            colors = AssistChipDefaults.assistChipColors()
-                        )
-                    }
-                }
-
-                /* Align-to-clock switch */
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(context.getString(R.string.label_align))
-                    Spacer(Modifier.width(8.dp))
-                    Switch(
-                        checked = alignToClock,
-                        onCheckedChange = { viewModel.setAlignToClock(it) }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -223,22 +106,30 @@ fun WhiteroseApp(viewModel: ViewModel = viewModel()) {
                             permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                         } else {
                             viewModel.startTimerService()
-                            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_started)) }
+                            scope.launch { snackbarHostState.showSnackbar("Timer started") }
                         }
                     }, enabled = !serviceRunning) {
-                        Text(context.getString(R.string.btn_start))
+                        Text("Start")
                     }
 
                     OutlinedButton(
                         onClick = {
                             viewModel.stopTimerService()
-                            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_stopped)) }
+                            scope.launch { snackbarHostState.showSnackbar("Timer stopped") }
                         },
                         enabled = serviceRunning
                     ) {
-                        Text(context.getString(R.string.btn_stop))
+                        Text("Stop")
                     }
                 }
+            }
+
+            /* ------------------------- Settings Overlay ------------------------- */
+            if (showSettings) {
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onClose = { showSettings = false }
+                )
             }
         }
     }
@@ -262,33 +153,107 @@ fun Clock() {
     )
 }
 
+/* -------------------------------------------------------------------------- */
 @Composable
-fun CountdownDisplay(nextTriggerMs: Long) {
-    val context = LocalContext.current
-    
-    // Derived state that updates when the current time changes
-    val remainingTime by produceState(initialValue = "00:00") {
-        while (true) {
-            val now = System.currentTimeMillis()
-            val remainingMs = maxOf(0L, nextTriggerMs - now)
-            
-            if (remainingMs > 0) {
-                val seconds = (remainingMs / 1000) % 60
-                val minutes = (remainingMs / (1000 * 60)) % 60
-                value = String.format(Locale.US, "%02d:%02d", minutes, seconds)
-            } else {
-                value = "00:00"
+fun SettingsScreen(viewModel: ViewModel, onClose: () -> Unit) {
+    val interval by viewModel.intervalMinutes.collectAsState()
+    val alignToClock by viewModel.alignToClock.collectAsState()
+    val playSound by viewModel.playSound.collectAsState()
+    val vibrate by viewModel.vibrate.collectAsState()
+    val mode by viewModel.mode.collectAsState()
+
+    var text by remember(interval) { mutableStateOf(interval.toString()) }
+
+    Surface(
+        color = MaterialTheme.colorScheme.background.copy(alpha = 0.97f),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            /* Close button */
+            TextButton(onClick = onClose) {
+                Text("Close")
             }
-            
-            delay(1000) // Update every second
+
+            Spacer(Modifier.height(8.dp))
+
+            /* Interval input */
+            OutlinedTextField(
+                value = text,
+                onValueChange = {
+                    val sanitized = it.filter { ch -> ch.isDigit() }.take(3)
+                    text = sanitized
+                    val minutes = sanitized.toIntOrNull() ?: 0
+                    if (minutes in 1..120) {
+                        viewModel.setIntervalMinutes(minutes)
+                    }
+                },
+                label = { Text("Interval (minutes)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            /* Presets */
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1, 5, 15).forEach { preset ->
+                    AssistChip(
+                        onClick = { viewModel.setIntervalMinutes(preset) },
+                        label = { Text("$preset") },
+                        colors = AssistChipDefaults.assistChipColors()
+                    )
+                }
+            }
+
+            /* Align switch */
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Align to clock")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = alignToClock, onCheckedChange = { viewModel.setAlignToClock(it) })
+            }
+
+            /* Sound toggle */
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Play sound")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = playSound, onCheckedChange = { viewModel.setPlaySound(it) })
+            }
+
+            /* Vibrate toggle */
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Vibrate")
+                Spacer(Modifier.width(8.dp))
+                Switch(checked = vibrate, onCheckedChange = { viewModel.setVibrate(it) })
+            }
+
+            /* Mode selection – vertical */
+            Spacer(Modifier.height(24.dp))
+            Text("Mode", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Column {
+                listOf(
+                    IntervalTimerService.MODE_SIMPLE to "Simple",
+                    IntervalTimerService.MODE_POMODORO_SIMPLE to "Pomodoro (25/5)",
+                    IntervalTimerService.MODE_POMODORO_ADVANCED to "Pomodoro (25/5 + 15)"
+                ).forEach { (value, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = mode == value,
+                            onClick = { viewModel.setMode(value) }
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(label)
+                    }
+                }
+            }
         }
-    }
-    
-    if (nextTriggerMs > 0) {
-        Text(
-            text = context.getString(R.string.next_in_label, remainingTime),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp)
-        )
     }
 }
